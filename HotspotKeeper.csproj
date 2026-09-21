@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>HotspotKeeper</RootNamespace>
+    <AssemblyName>HotspotKeeper</AssemblyName>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\App.ico</ApplicationIcon>
+    <Version>1.0.0</Version>
+    <Authors>明雨 (MingYu)</Authors>
+    <Product>HotspotKeeper</Product>
+    <Description>Windows 个人热点守护工具</Description>
+    <Copyright>© 2026 明雨 · github.com/mingyu0401</Copyright>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Scripts\hotspot.ps1" />
+    <Resource Include="Assets\avatar.jpg" />
+  </ItemGroup>
+
+</Project>
