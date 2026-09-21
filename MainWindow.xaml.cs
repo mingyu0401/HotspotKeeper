@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
@@ -6,6 +7,10 @@ using System.Windows.Navigation;
 using System.Windows.Threading;
 using HotspotKeeper.Services;
 using Microsoft.Win32;
+using Application = System.Windows.Application;
+using MessageBox = System.Windows.MessageBox;
+using OpenFileDialog = Microsoft.Win32.OpenFileDialog;
+using Brush = System.Windows.Media.Brush;
 
 namespace HotspotKeeper;
 
@@ -15,6 +20,9 @@ public partial class MainWindow : Window
     private bool _daemonRunning;
     private bool _busy;
     private bool _suppressComboEvent = true;
+    private TrayIcon? _tray;
+    private bool _reallyExit;
+    private bool _trayHintShown;
 
     public MainWindow()
     {
@@ -26,7 +34,46 @@ public partial class MainWindow : Window
 
         _timer.Tick += async (_, _) => await DaemonTickAsync();
 
+        _tray = new TrayIcon();
+        _tray.OpenRequested += ShowFromTray;
+        _tray.ExitRequested += () =>
+        {
+            _reallyExit = true;
+            Application.Current.Shutdown();
+        };
+
         Loaded += MainWindow_Loaded;
+    }
+
+    // 关闭窗口 = 隐藏到托盘，守护继续运行；只有托盘右键「退出」才真正关闭
+    protected override void OnClosing(CancelEventArgs e)
+    {
+        if (!_reallyExit)
+        {
+            e.Cancel = true;
+            Hide();
+            if (!_trayHintShown)
+            {
+                _trayHintShown = true;
+                _tray?.ShowBalloon("HotspotKeeper 仍在运行",
+                    "已最小化到系统托盘，热点守护继续运行。\n双击托盘图标恢复窗口，右键托盘图标可退出。");
+            }
+        }
+        base.OnClosing(e);
+    }
+
+    protected override void OnClosed(EventArgs e)
+    {
+        _tray?.Dispose();
+        _tray = null;
+        base.OnClosed(e);
+    }
+
+    private void ShowFromTray()
+    {
+        Show();
+        if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
+        Activate();
     }
 
     private async void MainWindow_Loaded(object sender, RoutedEventArgs e)

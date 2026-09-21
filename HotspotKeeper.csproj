@@ -4,6 +4,7 @@
     <OutputType>WinExe</OutputType>
     <TargetFramework>net8.0-windows</TargetFramework>
     <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>HotspotKeeper</RootNamespace>
@@ -20,6 +21,7 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Scripts\hotspot.ps1" />
+    <EmbeddedResource Include="Assets\App.ico" />
     <Resource Include="Assets\avatar.jpg" />
   </ItemGroup>
 

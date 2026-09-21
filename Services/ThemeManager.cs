@@ -1,5 +1,6 @@
 using System.Windows;
 using Microsoft.Win32;
+using Application = System.Windows.Application;
 
 namespace HotspotKeeper.Services;
 
