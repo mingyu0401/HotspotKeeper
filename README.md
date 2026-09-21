@@ -16,6 +16,10 @@
 - **开机自启动**（可选）：通过任务计划程序（最高权限）实现，登录时自动运行。
 - **深色模式**：跟随系统 / 浅色 / 深色 三种主题。
 
+## 下载
+
+最新发布页：**[Releases · v1.0.0](https://github.com/mingyu0401/HotspotKeeper/releases/tag/v1.0.0)**（直接下载 [HotspotKeeper.exe](https://github.com/mingyu0401/HotspotKeeper/releases/download/v1.0.0/HotspotKeeper.exe)）
+
 ## 使用
 
 1. 下载 `HotspotKeeper.exe`（自包含单文件，无需安装 .NET）。
