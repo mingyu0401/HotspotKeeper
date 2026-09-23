@@ -18,7 +18,7 @@
 
 ## 下载
 
-最新发布页：**[Releases · v1.0.0](https://github.com/mingyu0401/HotspotKeeper/releases/tag/v1.0.0)**（直接下载 [HotspotKeeper.exe](https://github.com/mingyu0401/HotspotKeeper/releases/download/v1.0.0/HotspotKeeper.exe)）
+最新发布页：**[Releases · v1.1.0](https://github.com/mingyu0401/HotspotKeeper/releases/tag/v1.1.0)**（直接下载 [HotspotKeeper.exe](https://github.com/mingyu0401/HotspotKeeper/releases/download/v1.1.0/HotspotKeeper.exe)）
 
 ## 使用
 
