@@ -11,6 +11,8 @@ using Application = System.Windows.Application;
 using MessageBox = System.Windows.MessageBox;
 using OpenFileDialog = Microsoft.Win32.OpenFileDialog;
 using Brush = System.Windows.Media.Brush;
+using Button = System.Windows.Controls.Button;
+using Orientation = System.Windows.Controls.Orientation;
 
 namespace HotspotKeeper;
 
@@ -204,16 +206,46 @@ public partial class MainWindow : Window
         var eth = await Ps.RunAsync("eth-off");
         if (!eth.Ok) SetStatus($"关闭有线失败：{eth.Error}");
 
+        SetStatus("等待 5 秒后打开 WiFi…");
+        await Task.Delay(5000);
+
         SetStatus("正在打开 WiFi…");
         var wifi = await Ps.RunAsync("wifi-on");
         if (!wifi.Ok) SetStatus($"打开 WiFi 失败：{wifi.Error}");
 
+        // 三选一：取消 / 已启动（用户已手动打开 Clash）/ 自动启动
+        var choice = ShowChoiceDialog("启动 Clash",
+            "请先启动 Clash。\n\n可选择自行手动启动，或由本程序自动启动。",
+            "取消", "已启动", "自动启动");
+        if (choice < 0)
+        {
+            SetStatus("已取消：未启动 Clash。");
+            return;
+        }
+
+        if (choice == 1)
+        {
+            SetStatus("已切换：有线关闭、WiFi 打开，Clash 由你手动启动。");
+            return;
+        }
+
         SetStatus("正在启动 Clash for Windows…");
         var clash = await Ps.RunAsync("clash-start",
             string.IsNullOrWhiteSpace(TxtClashPath.Text) ? null : TxtClashPath.Text.Trim());
-        SetStatus(clash.Ok
-            ? "已切换：有线关闭、WiFi 打开、Clash 已启动。"
-            : $"切换完成但有错误：{clash.Error}");
+        if (!clash.Ok)
+        {
+            SetStatus($"启动 Clash 失败：{clash.Error}");
+            return;
+        }
+
+        // 自动启动 Clash 后，提醒手动开启代理开关
+        var proxy = ShowChoiceDialog("代理开关",
+            "请在 Clash 中开启系统代理开关。\n\n开启后点击「已开启」完成切换。",
+            "取消", "已开启");
+
+        SetStatus(proxy == 1
+            ? "已切换：有线关闭、WiFi 打开、Clash 代理已开启。"
+            : "已切换，但你未确认代理已开启，请手动检查 Clash 代理开关。");
     }
 
     private async Task RestoreWiredAsync()
@@ -224,6 +256,8 @@ public partial class MainWindow : Window
         SetStatus("正在启用有线网卡…");
         var eth = await Ps.RunAsync("eth-on");
         SetStatus(eth.Ok ? "已恢复：Clash 已关闭，有线网已启用。" : $"启用有线失败：{eth.Error}");
+
+        await StartDaemonAsync();
     }
 
     // ---------- UI 事件 ----------
@@ -246,7 +280,7 @@ public partial class MainWindow : Window
     private async void BtnToWiredClash_Click(object sender, RoutedEventArgs e)
     {
         var confirm = MessageBox.Show(this,
-            "将执行：关闭有线网卡 → 打开 WiFi → 启动 Clash for Windows。\n\n" +
+            "将执行：关闭有线网卡 → 等待 5 秒 → 打开 WiFi → 启动 Clash for Windows。\n\n" +
             "此操作会短暂断网，且未经测试。确定继续吗？",
             "切换到 WiFi + Clash",
             MessageBoxButton.YesNo, MessageBoxImage.Warning);
@@ -256,12 +290,133 @@ public partial class MainWindow : Window
 
     private async void BtnRestore_Click(object sender, RoutedEventArgs e)
     {
-        var confirm = MessageBox.Show(this,
-            "将执行：关闭 Clash for Windows → 启用有线网卡。\n\n确定继续吗？",
-            "恢复有线网络",
-            MessageBoxButton.YesNo, MessageBoxImage.Question);
-        if (confirm != MessageBoxResult.Yes) return;
+        if (!ShowRestoreConfirmDialog()) return;
         await RestoreWiredAsync();
+    }
+
+    // 3 秒后才允许确认的恢复弹窗，提醒先手动关闭 Clash 代理
+    private bool ShowRestoreConfirmDialog()
+    {
+        bool result = false;
+        var dlg = new Window
+        {
+            Title = "恢复有线网络",
+            SizeToContent = SizeToContent.WidthAndHeight,
+            ResizeMode = ResizeMode.NoResize,
+            ShowInTaskbar = false,
+            WindowStyle = WindowStyle.SingleBorderWindow,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            Owner = this,
+            Background = (Brush)FindResource("WindowBg"),
+        };
+
+        var warn = new TextBlock
+        {
+            Text = "请先手动关闭 clash 的代理!!!",
+            FontSize = 16,
+            FontWeight = FontWeights.Bold,
+            Foreground = (Brush)FindResource("DangerFg"),
+            Margin = new Thickness(0, 0, 0, 10),
+        };
+        var desc = new TextBlock
+        {
+            Text = "将执行：关闭 Clash for Windows → 启用有线网卡 → 自动开启热点守护。",
+            TextWrapping = TextWrapping.Wrap,
+            Foreground = (Brush)FindResource("TextSecondary"),
+            Margin = new Thickness(0, 0, 0, 18),
+        };
+
+        var okBtn = new Button { Content = "确认（3 秒）", MinWidth = 100, Height = 30, IsEnabled = false };
+        var cancelBtn = new Button { Content = "取消", MinWidth = 100, Height = 30, IsCancel = true };
+        okBtn.Click += (_, _) => { result = true; dlg.Close(); };
+
+        var buttons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = System.Windows.HorizontalAlignment.Right,
+        };
+        buttons.Children.Add(cancelBtn);
+        var okMargin = okBtn.Margin;
+        okMargin.Left = 10;
+        okBtn.Margin = okMargin;
+        buttons.Children.Add(okBtn);
+
+        var panel = new StackPanel { Margin = new Thickness(20) };
+        panel.Children.Add(warn);
+        panel.Children.Add(desc);
+        panel.Children.Add(buttons);
+        dlg.Content = panel;
+
+        var remaining = 3;
+        var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+        timer.Tick += (_, _) =>
+        {
+            remaining--;
+            if (remaining > 0)
+            {
+                okBtn.Content = $"确认（{remaining} 秒）";
+                return;
+            }
+            timer.Stop();
+            okBtn.Content = "确认继续";
+            okBtn.IsEnabled = true;
+        };
+        dlg.Closed += (_, _) => timer.Stop();
+        timer.Start();
+
+        dlg.ShowDialog();
+        return result;
+    }
+
+    // 自定义多按钮询问弹窗，返回按钮下标；直接关闭窗口返回 -1
+    private int ShowChoiceDialog(string title, string message, params string[] buttons)
+    {
+        int choice = -1;
+        var dlg = new Window
+        {
+            Title = title,
+            SizeToContent = SizeToContent.WidthAndHeight,
+            ResizeMode = ResizeMode.NoResize,
+            ShowInTaskbar = false,
+            WindowStyle = WindowStyle.SingleBorderWindow,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            Owner = this,
+            Background = (Brush)FindResource("WindowBg"),
+        };
+
+        var panel = new StackPanel { Margin = new Thickness(20) };
+        panel.Children.Add(new TextBlock
+        {
+            Text = message,
+            TextWrapping = TextWrapping.Wrap,
+            Foreground = (Brush)FindResource("TextPrimary"),
+            Margin = new Thickness(0, 0, 0, 18),
+        });
+
+        var row = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = System.Windows.HorizontalAlignment.Right,
+        };
+        for (int i = 0; i < buttons.Length; i++)
+        {
+            int index = i;
+            var btn = new Button
+            {
+                Content = buttons[i],
+                MinWidth = 100,
+                Height = 30,
+                Margin = new Thickness(i == 0 ? 0 : 10, 0, 0, 0),
+                IsCancel = i == 0,
+            };
+            btn.Click += (_, _) => { choice = index; dlg.Close(); };
+            row.Children.Add(btn);
+        }
+        panel.Children.Add(row);
+        dlg.Content = panel;
+
+        dlg.ShowDialog();
+        return choice;
     }
 
     private async void ChkAutoStart_Changed(object sender, RoutedEventArgs e)
