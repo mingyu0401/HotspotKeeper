@@ -213,6 +213,15 @@ public partial class MainWindow : Window
         var wifi = await Ps.RunAsync("wifi-on");
         if (!wifi.Ok) SetStatus($"打开 WiFi 失败：{wifi.Error}");
 
+        // 启动 Clash 前：3 秒后才可确认的提醒弹窗
+        if (!ShowDelayedConfirmDialog("切换到 WiFi + Clash",
+                "请先启动 Clash",
+                "确认后将选择启动方式：已启动 / 自动启动。"))
+        {
+            SetStatus("已取消：未启动 Clash。");
+            return;
+        }
+
         // 三选一：取消 / 已启动（用户已手动打开 Clash）/ 自动启动
         var choice = ShowChoiceDialog("启动 Clash",
             "请先启动 Clash。\n\n可选择自行手动启动，或由本程序自动启动。",
@@ -290,17 +299,19 @@ public partial class MainWindow : Window
 
     private async void BtnRestore_Click(object sender, RoutedEventArgs e)
     {
-        if (!ShowRestoreConfirmDialog()) return;
+        if (!ShowDelayedConfirmDialog("恢复有线网络",
+                "请先手动关闭 clash 的代理!!!",
+                "将执行：关闭 Clash for Windows → 启用有线网卡 → 自动开启热点守护。")) return;
         await RestoreWiredAsync();
     }
 
-    // 3 秒后才允许确认的恢复弹窗，提醒先手动关闭 Clash 代理
-    private bool ShowRestoreConfirmDialog()
+    // 3 秒后才允许点击「确认」的提醒弹窗，返回 false 表示取消
+    private bool ShowDelayedConfirmDialog(string title, string warnText, string descText)
     {
         bool result = false;
         var dlg = new Window
         {
-            Title = "恢复有线网络",
+            Title = title,
             SizeToContent = SizeToContent.WidthAndHeight,
             ResizeMode = ResizeMode.NoResize,
             ShowInTaskbar = false,
@@ -312,7 +323,7 @@ public partial class MainWindow : Window
 
         var warn = new TextBlock
         {
-            Text = "请先手动关闭 clash 的代理!!!",
+            Text = warnText,
             FontSize = 16,
             FontWeight = FontWeights.Bold,
             Foreground = (Brush)FindResource("DangerFg"),
@@ -320,7 +331,7 @@ public partial class MainWindow : Window
         };
         var desc = new TextBlock
         {
-            Text = "将执行：关闭 Clash for Windows → 启用有线网卡 → 自动开启热点守护。",
+            Text = descText,
             TextWrapping = TextWrapping.Wrap,
             Foreground = (Brush)FindResource("TextSecondary"),
             Margin = new Thickness(0, 0, 0, 18),
